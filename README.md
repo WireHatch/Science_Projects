@@ -8,7 +8,7 @@ Each project includes its own folder with circuit diagrams, code, components lis
 - Water Level Indicator
 - Automatic Traffic & Street Light System
 - Automatic Plant Watering System
-- Automatic Gate Opening System
+- [Automatic Gate Opening System](/Automatic Gate Opening System)
 - Automatic Tap (IR Based)
 - Solar Powered Robot
 - Obstacle Avoiding Car
