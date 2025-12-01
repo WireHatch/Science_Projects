@@ -1,27 +1,85 @@
-# Automatic Gate Opening System
+# 🔐 Smart Gate Control With PIR + Servo (NodeMCU Version)
 
 ## 📌 Overview
-Short description of what this project does and why it is useful.
+This project is a **motion-activated smart gate system** using:
+- NodeMCU (ESP8266)
+- PIR motion sensor
+- Servo motor
+- RGB LEDs for status indication
+
+When motion is detected, the system:
+1. Turns ON the Red LED (warning)
+2. Opens the gate smoothly using a servo
+3. Turns ON the Green LED (gate open)
+4. Waits 3 seconds
+5. Flashes the Yellow LED (warning)
+6. Closes the gate smoothly
 
 ---
 
-## 🧰 Components Used
-- Component 1  
-- Component 2  
-- Component 3  
-(Add or remove items as needed)
+## 🛠 Used Components
+- NodeMCU ESP8266 (1 pcs)
+- PIR Sensor HC-SR501 (1 pcs)
+- SG90 or MG996R Servo Motor (1 pcs)
+- Red, Yellow, Green LEDs (3 pcs)
+- 220Ω resistors (3 pcs)
+- Jumper wires
+- 5V external supply for servo (recommended)
 
 ---
 
-## 🚦 Stages of Working
-Below are the general workflow stages for this project:
+## 🔌 Pin Connections (NodeMCU)
 
-### 1. **Power Initialization**
-- System receives power from battery/adapter.
-- ESP/Arduino boots up and starts the program.
+| Component | NodeMCU Pin | GPIO |
+|----------|-------------|-------|
+| Red LED        | D5 | GPIO14 |
+| Yellow LED     | D6 | GPIO12 |
+| Green LED      | D7 | GPIO13 |
+| PIR Sensor OUT | D1 | GPIO5  |
+| Servo Signal   | D4 | GPIO2  |
+
+⚠ **Important:**  
+Do NOT power the servo from the NodeMCU 3.3V pin.  
+Use **external 5V** + common ground.
 
 ---
 
+## 🎬 Stages of Operation
+1. **Idle Mode:**  
+   - Waiting for PIR motion.
 
+2. **Motion Detected:**  
+   - PIR = HIGH  
+   - Red LED ON  
+   - Gate starts opening.
 
+3. **Gate Opening:**  
+   - Servo moves from 110° → 180°  
+   - Green LED ON  
+   - Red LED OFF.
 
+4. **Gate Open (Hold):**  
+   - Wait 3 seconds.
+
+5. **Warning Stage:**  
+   - Green LED OFF  
+   - Yellow LED blinks 5 times.
+
+6. **Gate Closing:**  
+   - Servo moves 180° → 110°  
+   - Red LED briefly ON  
+   - System returns to idle.
+
+---
+
+## ⚙ Noticable Things / Notes
+
+### 🖥 Screen Size
+This project has **no display**, but you can add:
+- OLED SSD1306  
+- LCD 20x4  
+- TFT Display  
+If needed later.
+
+### 🔧 Servo Calibration
+- Default **closed** pos
