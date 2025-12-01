@@ -1,4 +1,4 @@
-# Science_Projects
+# Science Projects
 
 This repository contains 16 beginner-to-advanced electronics, robotics and IoT projects developed using ESP, Arduino, sensors, motors, and actuators.  
 Each project includes its own folder with circuit diagrams, code, components list, and documentation.
