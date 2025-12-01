@@ -76,7 +76,7 @@ Use **external 5V** + common ground.
 
 ---
 
-## ⚙ Noticable Things / Notes
+## ⚙ Notes
 
 ### 🖥 Screen Size
 This project has **no display**, but you can add:
