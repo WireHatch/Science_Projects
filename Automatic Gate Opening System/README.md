@@ -1,4 +1,5 @@
 # 🔐 Smart Gate Control With PIR + Servo (NodeMCU Version)
+![gate](https://github.com/user-attachments/assets/04d66ecf-7ca0-47da-ac90-04739867c773)
 
 ## 📌 Overview
 This project is a **motion-activated smart gate system** using:
