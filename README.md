@@ -23,3 +23,5 @@ Each project includes its own folder with circuit diagrams, code, components lis
 
 ## Some Related Videos
 
+- [ How to use Arduino IDE for uploading code ](https://youtu.be/ikBlhX-erSw?si=8sVIyiGjR3hitbRA)
+- 
