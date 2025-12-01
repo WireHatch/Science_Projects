@@ -38,6 +38,9 @@ When motion is detected, the system:
 | Green LED      | D7 | GPIO13 |
 | PIR Sensor OUT | D1 | GPIO5  |
 | Servo Signal   | D4 | GPIO2  |
+|   | Optional |   |
+| SDA  | D1 | GPIO5  |
+| SCL   | D2 | GPIO4 |
 
 ⚠ **Important:**  
 Do NOT power the servo from the NodeMCU 3.3V pin.  
