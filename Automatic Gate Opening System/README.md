@@ -1,4 +1,4 @@
-# Project Title
+# Automatic Gate Opening System
 
 ## 📌 Overview
 Short description of what this project does and why it is useful.
