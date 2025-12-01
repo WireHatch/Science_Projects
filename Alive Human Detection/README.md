@@ -12,7 +12,6 @@ The goal is to save electricity by ensuring light & fan only run when needed —
 |-----------|----------|-------------|
 | NodeMCU ESP8266 | 1 | Main controller |
 | PIR Sensor (HC-SR501) | 1 | Detects human presence |
-| Relay Module (Single or Dual) | 1–2 | Controls AC Light + Fan |
 | Light Bulb / Lamp | 1 | Load 1 |
 | Fan (Any type) | 1 | Load 2 |
 | Jumper Wires | — | For connections |
@@ -28,14 +27,6 @@ The goal is to save electricity by ensuring light & fan only run when needed —
 | VCC | 5V |
 | GND | GND |
 | OUT | D1 (GPIO 5) |
-
-### ESP8266 → Relay Module
-| Relay | Connect To |
-|-------|------------|
-| IN1 | D5 (GPIO 14) → Light |
-| IN2 | D6 (GPIO 12) → Fan |
-| VCC | 5V |
-| GND | GND |
 
 ---
 
