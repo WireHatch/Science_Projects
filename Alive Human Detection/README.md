@@ -24,10 +24,8 @@ This system is perfect for learning PIR motion sensing, PWM dimming, animations,
 |----------|----------|-------------|
 | ESP8266 (NodeMCU) **or** ESP32 | 1 | Main Microcontroller |
 | HC-SR501 PIR Motion Sensor | 1 | Detects human presence |
-| LEDs (Any color) | 3 | Output indicators |
-| 220Ω Resistors | 3 | LED current limiting |
+| LEDs (Any color) |  | Output indicators |
 | Jumper Wires | — | Connections |
-| Breadboard | 1 | Prototyping |
 
 ---
 
