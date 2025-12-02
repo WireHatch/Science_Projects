@@ -1,5 +1,5 @@
 // ===============================
-// NODEMCU ESP8266 + PIR + 3 LED CHASER SYSTEM
+// NODEMCU ESP8266 + PIR + 3 LED CHASER SYSTEM (1.5V PWM)
 // ===============================
 
 // ---- PIN DEFINITIONS (ESP8266 GPIO) ----
@@ -12,15 +12,20 @@
 unsigned long lastMotionTime = 0;
 const unsigned long OFF_DELAY = 15000;  // 15 seconds after no motion
 
+// ---- PWM VALUE FOR ~1.5V LED BRIGHTNESS ----
+const int LED_POWER = 460;  // Around 1.5V equivalent PWM
+
 // --------------------------------------
 // LED CHASER WHEN MOTION IS DETECTED
 // --------------------------------------
 void chaserEffect() {
-  digitalWrite(LED1_PIN, HIGH);  
+  analogWrite(LED1_PIN, LED_POWER);
   delay(100);
-  digitalWrite(LED2_PIN, HIGH);
+
+  analogWrite(LED2_PIN, LED_POWER);
   delay(100);
-  digitalWrite(LED3_PIN, HIGH);
+
+  analogWrite(LED3_PIN, LED_POWER);
   delay(100);
 }
 
@@ -29,14 +34,14 @@ void chaserEffect() {
 // --------------------------------------
 void warningBlink() {
   for (int i = 0; i < 5; i++) {
-    digitalWrite(LED1_PIN, HIGH);
-    digitalWrite(LED2_PIN, HIGH);
-    digitalWrite(LED3_PIN, HIGH);
+    analogWrite(LED1_PIN, LED_POWER);
+    analogWrite(LED2_PIN, LED_POWER);
+    analogWrite(LED3_PIN, LED_POWER);
     delay(200);
 
-    digitalWrite(LED1_PIN, LOW);
-    digitalWrite(LED2_PIN, LOW);
-    digitalWrite(LED3_PIN, LOW);
+    analogWrite(LED1_PIN, 0);
+    analogWrite(LED2_PIN, 0);
+    analogWrite(LED3_PIN, 0);
     delay(200);
   }
 }
@@ -49,10 +54,12 @@ void setup() {
   pinMode(LED3_PIN, OUTPUT);
   pinMode(PIR_PIN, INPUT);
 
+  analogWriteRange(1023);  // default, ensures consistent PWM
+
   // Ensure OFF at start
-  digitalWrite(LED1_PIN, LOW);
-  digitalWrite(LED2_PIN, LOW);
-  digitalWrite(LED3_PIN, LOW);
+  analogWrite(LED1_PIN, 0);
+  analogWrite(LED2_PIN, 0);
+  analogWrite(LED3_PIN, 0);
 
   Serial.println("System Ready - Waiting for Motion...");
 }
@@ -67,10 +74,10 @@ void loop() {
     // LED Chaser Effect
     chaserEffect();
 
-    // Keep LEDs ON
-    digitalWrite(LED1_PIN, HIGH);
-    digitalWrite(LED2_PIN, HIGH);
-    digitalWrite(LED3_PIN, HIGH);
+    // Keep LEDs ON with 1.5V brightness
+    analogWrite(LED1_PIN, LED_POWER);
+    analogWrite(LED2_PIN, LED_POWER);
+    analogWrite(LED3_PIN, LED_POWER);
 
     // Reset timer
     lastMotionTime = millis();
@@ -85,9 +92,9 @@ void loop() {
       warningBlink();
 
       // Turn all LEDs OFF
-      digitalWrite(LED1_PIN, LOW);
-      digitalWrite(LED2_PIN, LOW);
-      digitalWrite(LED3_PIN, LOW);
+      analogWrite(LED1_PIN, 0);
+      analogWrite(LED2_PIN, 0);
+      analogWrite(LED3_PIN, 0);
 
       Serial.println("No Motion - LEDs OFF");
     }
