@@ -1,22 +1,18 @@
-# PIR-Based 3-LED Chaser System (ESP32 + ESP8266)
+# PIR-Based Smart Home System (ESP32 + ESP8266)
 
 A universal motion-activated LED system compatible with both **ESP32 and ESP8266**.  
-When the PIR detects movement, a **smooth LED chaser animation** plays, then all LEDs stay ON at low brightness.  
-If no movement is detected for 5 seconds, the LEDs perform a **warning blink** with accelerating speed and then turn OFF.
+When the PIR detects movement, lights turn on, then all LEDs stay ON at low brightness.  
+If no movement is detected for 5 seconds, the LEDs perform a **warning blink** and then turn OFF.
 
-This system is perfect for learning PIR motion sensing, PWM dimming, animations, and embedded timing logic.
 
 ---
 
 ## 🛠 Features
 - Universal: Works on **ESP32 & ESP8266**
 - PIR motion detection (HC-SR501)
-- 3-step LED chaser animation
-- 1.5V-equivalent LED brightness via PWM
 - Accelerating blinking warning before shutdown
 - Auto-reset on next detection
 - Debounce and timer-controlled fade logic
-
 ---
 
 ## 📦 Components Required
@@ -58,7 +54,7 @@ This system is perfect for learning PIR motion sensing, PWM dimming, animations,
 ### **2️⃣ Motion Detected**
 - PIR output HIGH  
 - Chaser animation runs:  
-  LED1 → LED1+LED2 → LED1+LED2+LED3  
+- LED1 → LED1+LED2 → LED1+LED2+LED3  
 - Then all LEDs stay ON at low brightness
 
 ### **3️⃣ Continuous Motion**
