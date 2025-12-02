@@ -1,4 +1,4 @@
-# PIR-Based Smart Home System (ESP32 + ESP8266)
+# PIR-Based Human Detection System (ESP32 + ESP8266)
 
 A universal motion-activated LED system compatible with both **ESP32 and ESP8266**.  
 When the PIR detects movement, lights turn on, then all LEDs stay ON at low brightness.  
