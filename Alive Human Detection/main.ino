@@ -1,26 +1,58 @@
 // ===============================
-// NODEMCU ESP8266 + PIR + Light + Fan
+// NODEMCU ESP8266 + PIR + 3 LED CHASER SYSTEM
 // ===============================
 
 // ---- PIN DEFINITIONS (ESP8266 GPIO) ----
-#define LIGHT_PIN   14   // D5
-#define FAN_PIN     12   // D6
-#define PIR_PIN     5    // D1 (PIR Sensor)
+#define LED1_PIN  14   // D5
+#define LED2_PIN  12   // D6
+#define LED3_PIN  13   // D7
+#define PIR_PIN    5   // D1 (PIR Sensor)
 
 // ---- TIMER ----
 unsigned long lastMotionTime = 0;
 const unsigned long OFF_DELAY = 15000;  // 15 seconds after no motion
 
+// --------------------------------------
+// LED CHASER WHEN MOTION IS DETECTED
+// --------------------------------------
+void chaserEffect() {
+  digitalWrite(LED1_PIN, HIGH);  
+  delay(100);
+  digitalWrite(LED2_PIN, HIGH);
+  delay(100);
+  digitalWrite(LED3_PIN, HIGH);
+  delay(100);
+}
+
+// --------------------------------------
+// BLINK ALL LEDs BEFORE SHUTTING OFF
+// --------------------------------------
+void warningBlink() {
+  for (int i = 0; i < 5; i++) {
+    digitalWrite(LED1_PIN, HIGH);
+    digitalWrite(LED2_PIN, HIGH);
+    digitalWrite(LED3_PIN, HIGH);
+    delay(200);
+
+    digitalWrite(LED1_PIN, LOW);
+    digitalWrite(LED2_PIN, LOW);
+    digitalWrite(LED3_PIN, LOW);
+    delay(200);
+  }
+}
+
 void setup() {
   Serial.begin(9600);
 
-  pinMode(LIGHT_PIN, OUTPUT);
-  pinMode(FAN_PIN, OUTPUT);
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+  pinMode(LED3_PIN, OUTPUT);
   pinMode(PIR_PIN, INPUT);
 
   // Ensure OFF at start
-  digitalWrite(LIGHT_PIN, LOW);
-  digitalWrite(FAN_PIN, LOW);
+  digitalWrite(LED1_PIN, LOW);
+  digitalWrite(LED2_PIN, LOW);
+  digitalWrite(LED3_PIN, LOW);
 
   Serial.println("System Ready - Waiting for Motion...");
 }
@@ -29,23 +61,37 @@ void loop() {
   bool motion = digitalRead(PIR_PIN);
 
   if (motion == HIGH) {
+
     Serial.println("Motion Detected!");
 
-    // Turn ON devices
-    digitalWrite(LIGHT_PIN, HIGH);
-    digitalWrite(FAN_PIN, HIGH);
+    // LED Chaser Effect
+    chaserEffect();
 
-    // Update last motion time
+    // Keep LEDs ON
+    digitalWrite(LED1_PIN, HIGH);
+    digitalWrite(LED2_PIN, HIGH);
+    digitalWrite(LED3_PIN, HIGH);
+
+    // Reset timer
     lastMotionTime = millis();
   }
   else {
-    // If no motion for OFF_DELAY time → turn Off
+    // Check auto OFF condition
     if (millis() - lastMotionTime >= OFF_DELAY) {
-      digitalWrite(LIGHT_PIN, LOW);
-      digitalWrite(FAN_PIN, LOW);
-      Serial.println("No Motion - Devices OFF");
+      
+      Serial.println("Preparing to turn OFF...");
+
+      // Warning blink before shutting down
+      warningBlink();
+
+      // Turn all LEDs OFF
+      digitalWrite(LED1_PIN, LOW);
+      digitalWrite(LED2_PIN, LOW);
+      digitalWrite(LED3_PIN, LOW);
+
+      Serial.println("No Motion - LEDs OFF");
     }
   }
 
-  delay(200);
+  delay(150);
 }
