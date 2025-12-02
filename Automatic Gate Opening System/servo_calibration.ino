@@ -1,47 +1,55 @@
-// ===============================
-// UNIVERSAL SERVO CALIBRATION CODE
-// Works on ESP32 and ESP8266
-// ===============================
+#include <Servo.h>
 
-#include <ESP32Servo.h>   // Safe to include: works also on ESP8266 using Servo.h internally
+#define SERVO_PIN 2   // D4 on NodeMCU
+
 Servo servo;
-
-#define SERVO_PIN 13   // Change according to your wiring
 
 void setup() {
   Serial.begin(9600);
-  delay(500);
 
-  Serial.println();
-  Serial.println("=== SERVO CALIBRATION TOOL ===");
-  Serial.println("Enter angle between 0 – 180");
-  Serial.println("Type values slowly (e.g., 0, 30, 90, 180)");
+  // MG90S recommended pulse width range
+  servo.attach(SERVO_PIN, 500, 2400);
 
-#if defined(ESP32)
-  // Allocate timers for ESP32 Servo Library
-  ESP32PWM::allocateTimer(0);
-  ESP32PWM::allocateTimer(1);
-  ESP32PWM::allocateTimer(2);
-  ESP32PWM::allocateTimer(3);
-
-  servo.setPeriodHertz(50);       // Standard servo frequency 50Hz
-  servo.attach(SERVO_PIN, 500, 2400);  // Min/Max pulse width for fine calibration
-#else
-  // ESP8266 uses normal attach
-  servo.attach(SERVO_PIN);        // Uses default 544–2400 μs
-#endif
+  Serial.println("======================================");
+  Serial.println("      MG90S SERVO CALIBRATION");
+  Serial.println("======================================");
+  Serial.println("Type an angle (0–180) and press ENTER");
+  Serial.println("Example: 90");
+  Serial.println("======================================");
 }
 
+String inputString = "";
+bool newData = false;
+
 void loop() {
-  if (Serial.available()) {
-    int angle = Serial.parseInt();  // Read number
+
+  // ----------- Read Serial ---------------
+  while (Serial.available()) {
+    char c = Serial.read();
+
+    if (c == '\n' || c == '\r') {
+      newData = true;
+      break;
+    } else {
+      inputString += c;
+    }
+  }
+
+  // ---------- Process User Input ----------
+  if (newData) {
+    int angle = inputString.toInt();
+    inputString = "";
+    newData = false;
 
     if (angle >= 0 && angle <= 180) {
       servo.write(angle);
-      Serial.print("Moved to angle: ");
+      Serial.print("MG90S moved to: ");
       Serial.println(angle);
     } else {
-      Serial.println("Invalid! Enter a value between 0–180.");
+      Serial.println("Invalid angle! Enter 0–180 only.");
     }
+
+    Serial.println("--------------------------------------");
+    Serial.println("Enter next angle:");
   }
 }
