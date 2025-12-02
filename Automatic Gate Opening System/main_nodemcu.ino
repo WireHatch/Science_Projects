@@ -19,7 +19,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define R       14    // D5
 #define Y       12    // D6
 #define G       13    // D7
-#define sensor  5     // D1 = PIR sensor
+#define sensor  0     // D3 = PIR sensor
 #define SERVO_PIN  2  // D4 servo pin
 
 // ---- OLED TEXT FUNCTION ----
@@ -57,7 +57,7 @@ void showMessage(String msg) {
   int startY = (64 - totalHeight) / 2;
 
   for (int i = 0; i < wordCount; i++) {
-    int16_t x1, y1;
+    int16_t x1, y1; 
     uint16_t w, h;
 
     display.getTextBounds(words[i], 0, 0, &x1, &y1, &w, &h);
@@ -74,6 +74,8 @@ void showMessage(String msg) {
 
 // ----- Smooth Servo Movement -----
 void smoothServoMove(int start, int end, int stepDelay) {
+  if (stepDelay < 1) stepDelay = 1;    // prevent ESP reset
+
   if (start < end) {
     for (int pos = start; pos <= end; pos++) {
       servo.write(pos);
@@ -103,7 +105,7 @@ void setup() {
   pinMode(R, OUTPUT);
   pinMode(Y, OUTPUT);
   pinMode(G, OUTPUT);
-  pinMode(sensor, INPUT);
+  pinMode(sensor,INPUT_PULLUP);
 
   // ---- OLED INIT ----
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -115,9 +117,9 @@ void setup() {
   delay(1500);
 
   // ---- SERVO INIT ----  
-  servo.attach(SERVO_PIN);  // ESP8266 default pulse OK
+  servo.attach(SERVO_PIN, 500, 2400);
+  servo.write(0);              // gate closed (start position)
 
-  servo.write(110);  // Gate closed
   showMessage("Waiting for Motion");
 }
 
@@ -126,8 +128,7 @@ void loop() {
   Serial.println(value);
 
   if (value == HIGH) {
-
-    delay(500);  // Debounce PIR
+    delay(400);  // PIR debounce
 
     if (digitalRead(sensor) == HIGH) {
 
@@ -136,12 +137,12 @@ void loop() {
 
       // ---- Opening Gate ----
       showMessage("Gate Opening...");
-      smoothServoMove(110, 180, 30);
+      smoothServoMove(0, 80, 0);
 
       digitalWrite(G, HIGH);
       digitalWrite(R, LOW);
 
-      showMessage("Hold 3_Secs");
+      showMessage("Hold 3 Secs");
       delay(3000);
 
       // ---- Warning Before Closing ----
@@ -152,7 +153,7 @@ void loop() {
       // ---- Closing Gate ----
       showMessage("Gate Closing...");
       digitalWrite(R, HIGH);
-      smoothServoMove(180, 110, 30);
+      smoothServoMove(80, 0, 0);
       digitalWrite(R, LOW);
 
       showMessage("Waiting for Motion");
