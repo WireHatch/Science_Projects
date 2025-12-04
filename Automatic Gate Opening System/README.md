@@ -4,7 +4,7 @@
 ## 📌 Overview
 This project is a **motion-activated smart gate system** using:
 - NodeMCU (ESP8266)
-- PIR motion sensor(https://lastminuteengineers.com/pir-sensor-arduino-tutorial/)
+- [PIR motion sensor](https://lastminuteengineers.com/pir-sensor-arduino-tutorial/)
 - Servo motor
 - RGB LEDs for status indication
 
