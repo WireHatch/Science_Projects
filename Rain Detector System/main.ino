@@ -8,12 +8,12 @@
 Servo servo;
 
 // ---- PIN DEFINITIONS (ESP8266 GPIO) ----
-#define RAIN_SENSOR  0   // D3 (Rain sensor digital output)
-#define SERVO_PIN    2   // D4
+#define RAIN_SENSOR  D3   // D3 (Rain sensor digital output)
+#define SERVO_PIN    D5   // D5
 
 // ---- SERVO POSITIONS ----
-int close_pos = 0;     // Lid/roof closed
-int open_pos  = 90;    // Lid/roof open (change if needed)
+int close_pos = 90;     // Lid/roof closed
+int open_pos  = 0;    // Lid/roof open (change if needed)
 
 void setup() {
   Serial.begin(9600);
@@ -38,7 +38,7 @@ void loop() {
   Serial.print("Rain Sensor State: ");
   Serial.println(rainDetected);
 
-  if (rainDetected == 0) {
+  if (rainDetected == 1) {
     // Rain present
     Serial.println("Rain detected → Opening roof/cover");
     servo.write(open_pos);
