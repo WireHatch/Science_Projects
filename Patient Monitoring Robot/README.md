@@ -1,207 +1,145 @@
-
-
-# 📌 **ESP8266 Health Monitoring System with Blynk**
-
-**Sensors:** DS18B20 Temperature Sensor, MAX30100 Pulse-Oximeter
-**Display:** 16x2 LCD (I2C)
-**Features:** Stage-wise measurement, cloud upload, alerts, timestamp logging
+# ESP32 Health Monitoring System  
+### (MAX30102 | DS18B20 | LCD | Servo Pill Dispenser | Multi-Stage State Machine)
 
 ---
 
-## 📝 **1. Overview**
+## 📌 Overview
 
-This project is a **portable health monitoring device** built using the ESP8266 NodeMCU board that measures:
+This project is a smart **health monitoring and medication dispensing system** built using an **ESP32 Microcontroller**.  
 
-* **Body Temperature (°C / °F)**
-* **Heart Rate (BPM)**
-* **Oxygen Level SpO₂ (%)**
+It performs the following automated health measurements:
 
-The device shows all vitals on the LCD **step-by-step**, saves data to **Blynk Cloud**, and triggers **alerts** if any reading becomes abnormal.
+- **Body Temperature** using DS18B20
+- **Heart Rate (BPM)** using MAX30102 IR-based optical sensor
+- **Blood Oxygen Saturation (SpO2%)** using the MAX30102 sensor algorithm
 
----
+After measurement, the system displays a summary report on an **I2C LCD display** and supports a servo-driven **automatic pill dispensing mechanism**.
 
-## ⚙️ **2. Hardware Used**
+User interaction happens through a **three-button control interface** supporting:
 
-| Component                      | Purpose                            |
-| ------------------------------ | ---------------------------------- |
-| **ESP8266 NodeMCU**            | Main microcontroller + WiFi        |
-| **DS18B20 Temperature Sensor** | Measures body temperature          |
-| **MAX30100 Pulse Oximeter**    | Measures heart rate + blood oxygen |
-| **16x2 LCD (I2C)**             | Displays values                    |
-| **Push Button**                | Start measurement                  |
-| **Wires + Breadboard**         | Basic connections                  |
+| Button Function | Description |
+|----------------|-------------|
+| NEXT / START | Begin or advance process |
+| RESTART / CONFIRM | Reset measurement or confirm restart |
+| HOLD / DISPENSE | Pause ongoing process or interact with dispenser |
 
----
-
-## 🔌 **3. Pin Connections**
-
-### **MAX30100 Pulse Oximeter**
-
-| MAX30100 | NodeMCU    |
-| -------- | ---------- |
-| SDA      | D2 (GPIO4) |
-| SCL      | D1 (GPIO5) |
-| VIN      | 3.3V       |
-| GND      | GND        |
-
-### **DS18B20 Temperature Sensor**
-
-| DS18B20 | NodeMCU    |
-| ------- | ---------- |
-| Signal  | D4 (GPIO2) |
-| VCC     | 3.3V       |
-| GND     | GND        |
-
-### **LCD 16x2 (I2C)**
-
-| LCD | NodeMCU    |
-| --- | ---------- |
-| SDA | D2 (GPIO4) |
-| SCL | D1 (GPIO5) |
-| VCC | 5V         |
-| GND | GND        |
-
-### **Push Button**
-
-| Button     | NodeMCU    |
-| ---------- | ---------- |
-| One side   | D3 (GPIO0) |
-| Other side | GND        |
+A non-blocking **state machine** runs the workflow including finger detection, measurement sequencing, reporting, and restart handling.
 
 ---
 
-## 📚 **4. Software / Libraries Required**
+## 🔌 Pin Connections
 
-Add these from Arduino Library Manager:
-
-* **Blynk**
-* **DallasTemperature**
-* **OneWire**
-* **LiquidCrystal_I2C**
-* **MAX30100_PulseOximeter**
-* **ESP8266WiFi**
-
----
-
-## 🚦 **5. System Workflow (Stages)**
-
-### **Stage 1 — IDLE MODE**
-
-* Waits for user button press or finger placement.
-* Shows time and status on LCD.
-
-### **Stage 2 — PLACE FINGER**
-
-* Asks user to place finger on MAX30100.
-* Auto-detects finger.
-
-### **Stage 3 — TEMPERATURE MEASUREMENT (3 sec)**
-
-* Reads body temperature from DS18B20.
-* Displays °C and °F.
-
-### **Stage 4 — HEART-RATE MEASUREMENT (10 sec)**
-
-* Reads beats per minute using MAX30100.
-* Shows stable value.
-
-### **Stage 5 — OXYGEN LEVEL SpO₂ (10 sec)**
-
-* Measures oxygen saturation.
-* Shows percentage in real time.
-
-### **Stage 6 — REPORT DISPLAY (10 sec)**
-
-A summary is shown:
-
-```
-T:98°F HR:72 O:98
-```
-
-### **Stage 7 — CLOUD UPLOAD**
-
-* Sends all readings to Blynk App:
-
-  * Heart Rate
-  * SpO₂
-  * Temperature
-  * Timestamp
-
-* If unsafe values detected → **Blynk Alert Notification**
+| Component | Connection | ESP32 Pin |
+|----------|------------|-----------|
+| **Servo Motor** | Signal | GPIO 13 |
+| **DS18B20 Temperature Sensor** | Data | GPIO 4 |
+| **MAX30102 Sensor** | SDA / SCL | GPIO 21 / GPIO 22 |
+| **LCD Display (I2C)** | SDA / SCL | GPIO 21 / GPIO 22 |
+| **Button A (Next / Start)** | Input Pull-Up | GPIO 15 |
+| **Button B (Restart / Confirm)** | Input Pull-Up | GPIO 14 |
+| **Button C (Hold / Dispense)** | Input Pull-Up | GPIO 12 |
 
 ---
 
-## 🚨 **6. Automatic Alerts**
+## 🧠 System Stages (State Machine Flow)
 
-The system checks:
+| Stage | Description |
+|--------|------------|
+| **IDLE** | System waiting for user input |
+| **SHOW MENU** | Prompt user to begin measurement |
+| **PLACE_FINGER_ON_SENSOR** | Checks for valid finger placement on MAX30102 |
+| **INITIALIZING_MEASUREMENT** | Prepares sensors & captures stable readings |
+| **MEASURING_TEMPERATURE** | Reads body temperature |
+| **MEASURING_PULSE** | Detects real heartbeat and calculates BPM |
+| **MEASURING_SPO2** | Estimates oxygen saturation level |
+| **SHOWING_REPORT** | Summary shown on LCD |
+| **AWAITING_CANCEL_CONFIRMATION** | Confirms restart request |
 
-| Vital       | Alert Condition     |
-| ----------- | ------------------- |
-| Heart Rate  | >120 BPM or <50 BPM |
-| SpO₂        | <92%                |
-| Temperature | >100.4°F or <95°F   |
-
-Problems are reported instantly in Blynk.
-
----
-
-# 🧠 **7. Simple Explanation for Non-Engineers**
-
-(How these sensors work internally)
-
-Here is an easy-to-understand version:
+(Additional paused states handled using button "HOLD".)
 
 ---
 
-## 🧊 **DS18B20 Temperature Sensor — “Digital Thermometer Chip”**
+## 📡 Sensors and Working Principles
 
-* Inside the sensor, there is a **tiny electronic thermometer**.
-* When it touches your skin, the chip senses heat.
-* It turns that heat into numbers (°C/°F).
-* The ESP8266 reads this number digitally—no analog signal, no noise.
+### 1️⃣ MAX30102 (Heart Rate & SpO₂)
 
-➡️ **Think of it like a digital thermometer inside a USB pen-drive.**
+- Uses **optical PPG (Photoplethysmography)**.
+- Emits red/IR light and measures intensity changes from blood flow.
+- Detects:
+  - **Heart Rate (BPM)** based on time between peaks.
+  - **SpO₂** ratio using absorption differences of red vs infrared wavelengths.
 
----
-
-## ❤️ **MAX30100 Pulse Oximeter — “Red & Infrared Light Trick”**
-
-This is the same technology used in smartwatches and hospital pulse clips.
-
-### Inside the sensor:
-
-* A **red LED**
-* An **infrared LED**
-* A **light detector (photodiode)**
-
-### How it works:
-
-1. Red & IR light is shined into your finger.
-2. Blood absorbs light differently depending on:
-
-   * How much oxygen is in it (SpO₂)
-   * How fast it pulses (heart rate)
-3. The detector measures how much light comes back.
-4. The sensor calculates:
-
-   * Every beat → **Heart Rate**
-   * Light absorption → **Oxygen Saturation (SpO₂)**
-
-➡️ **It basically looks at your blood using red light—without cutting the skin.**
+📍 **Finger detection is performed using IR signal threshold** (>50,000).
 
 ---
 
-## 🧠 **LCD Display**
+### 2️⃣ DS18B20 Temperature Sensor
 
-* The ESP8266 sends text to the LCD using only 2 wires (I2C).
-* LCD shows all results live.
+- Uses **1-Wire digital communication**.
+- Measures temperature with **±0.5°C accuracy**.
+- Reads temperature every cycle using the DallasTemperature library.
+
+---
+
+### 3️⃣ Servo Motor Mechanism
+
+- Controlled through ESP32 PWM signal.
+- Moves to specific angles to rotate a pill dispenser compartment.
+
+| Compartment | Angle |
+|------------|-------|
+| Morning | 0° |
+| Noon | 45° |
+| Evening | 90° |
+| Night | 135° |
+| Rest Position | 180° |
 
 ---
 
-## ☁️ **Blynk Cloud**
+## 🔄 Process Summary
 
-* ESP8266 uses WiFi
-* Sends your temperature, heart rate, and oxygen level
-* Shows everything on your mobile dashboard instantly
+1. **User presses NEXT** → System initializes.
+2. **System detects finger** using IR sensor.
+3. **Temperature is measured**.
+4. **Heart rate is measured** using peak-to-peak timing.
+5. **SpO₂ is estimated**.
+6. **Results displayed on LCD**.
+7. (Optional) **Hold / Restart / Pill dispense actions** available anytime.
 
 ---
+
+## 🛠 Libraries Used
+
+| Library | Function |
+|--------|----------|
+| `Wire.h` | I2C communication |
+| `LiquidCrystal_I2C.h` | LCD interfacing |
+| `DallasTemperature.h` & `OneWire.h` | DS18B20 sensing |
+| `ESP32Servo.h` | Servo control |
+| `MAX30105.h`, `spo2_algorithm.h`, `heartRate.h` | MAX30102 processing |
+
+---
+
+## 🚀 Features
+
+- Interactive 3-Button Control
+- Auto finger detection
+- State-driven workflow
+- Debouncing for all buttons
+- Safeguards for invalid sensor readings
+- Resume / Hold capability
+
+---
+
+## 📄 Summary
+
+This program combines medical sensing with automation using a structured state machine. It can serve as a part of:
+
+- Remote healthcare systems  
+- Smart medication assistants  
+- IoT-based health monitoring platforms  
+
+---
+
+### ✔ Ready to Upload & Run on ESP32.
+
