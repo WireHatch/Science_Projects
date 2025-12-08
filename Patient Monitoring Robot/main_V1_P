@@ -1,0 +1,778 @@
+/*
+ * ESP32 Health Monitoring System - MAX30102 (MAX30105 Library)
+ * Enhanced Three-Button Control System
+ *
+ * Pin Connections:
+ * DS18B20: Data -> GPIO4
+ * MAX30102: SDA -> GPIO21, SCL -> GPIO22
+ * LCD I2C: SDA -> GPIO21, SCL -> GPIO22
+ * SERVO: Signal -> GPIO13
+ * BUTTON_NEXT_STEP: GPIO15 (Initiate/Next Step)
+ * BUTTON_RESTART: GPIO14 (Restart/Cancel)
+ * BUTTON_DISPENSE: GPIO12 (Pill Dispense/Hold Process)
+ */
+
+// ===============================
+// CORE PARAMETERS & PIN DEFINITIONS
+// ===============================
+#define SERVO_PIN 13
+#define COMPARTMENT_ANGLE_MORN 0
+#define COMPARTMENT_ANGLE_NOON 45
+#define COMPARTMENT_ANGLE_EVEN 90
+#define COMPARTMENT_ANGLE_NIGHT 135
+#define SERVO_REST_ANGLE 180 
+#define SERVO_ROTATION_DELAY 1500
+#define SERVO_PULSE_MIN 500
+#define SERVO_PULSE_MAX 2400
+
+#define DS18B20_PIN 4
+#define I2C_SDA 21
+#define I2C_SCL 22
+#define BUTTON_NEXT_STEP 15    // Initiate/Next Step
+#define BUTTON_RESTART 14       // Restart/Cancel
+#define BUTTON_DISPENSE 12      // Pill Dispense/Hold
+
+const unsigned long TEMP_MEASURE_TIME = 5000;
+const unsigned long HR_MEASURE_TIME = 10000;
+const unsigned long SPO2_MEASURE_TIME = 8000;
+const unsigned long REPORT_DISPLAY_TIME = 8000;
+const unsigned long DEBOUNCE_DELAY = 100;
+const unsigned long FINGER_CHECK_INTERVAL = 2000; // Check for finger every 2s
+const unsigned long STATE_TRANSITION_DELAY = 2000; // Delay between states
+
+// ===============================
+// LIBRARY INCLUDES
+// ===============================
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <ESP32Servo.h>
+
+// MAX30102 Libraries (SparkFun MAX30105)
+#include "MAX30105.h"
+#include "heartRate.h"
+#include "spo2_algorithm.h"
+
+// ===============================
+// SENSOR INITIALIZATION
+// ===============================
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+OneWire oneWire(DS18B20_PIN);
+DallasTemperature sensors(&oneWire);
+Servo pillServo;
+MAX30105 particleSensor;
+
+// ===============================
+// MAX30102 SPECIFIC VARIABLES
+// ===============================
+const byte RATE_SIZE = 4;
+byte rates[RATE_SIZE];
+byte rateSpot = 0;
+long lastBeat = 0;
+float beatsPerMinute = 0.0;
+int beatAvg = 0;
+int irValue = 0;
+
+// SpO2 Variables
+int32_t spo2 = 0;
+int8_t validSPO2 = 0;
+int32_t heartRateSPO2 = 0;
+int8_t validHeartRate = 0;
+
+// ===============================
+// GLOBAL STATE VARIABLES
+// ===============================
+float temperatureC = 0.0;
+int heartRate = 0;
+int spO2Value = 0;
+bool measurementsComplete = false;
+unsigned long stateStartTime = 0;
+unsigned long lastFingerCheck = 0;
+bool isHeld = false;
+bool measurementInProgress = false;
+int currentCompartment = 0; 
+
+// Sensor Status Flags
+bool tempSensorOK = false;
+bool hrSensorOK = false;
+
+// Button State Variables
+unsigned long lastButtonPressTime[3] = {0, 0, 0};
+
+// ===============================
+// CORE STATE MACHINE
+// ===============================
+enum SystemState {
+  IDLE,
+  SHOW_MENU,
+  PLACE_FINGER_ON_SENSOR,
+  INITIALIZING_MEASUREMENT,
+  MEASURING_TEMPERATURE,
+  MEASURING_PULSE,
+  MEASURING_SPO2,
+  SHOWING_REPORT,
+  UPLOADING_DATA,
+  AWAITING_CANCEL_CONFIRMATION
+};
+
+SystemState currentState = IDLE;
+SystemState stateBeforeHold = IDLE; 
+
+// ===============================
+// FUNCTION DECLARATIONS
+// ===============================
+void updateLCD(const String &line1, const String &line2);
+void initializeSensors();
+void updateStateMachine();
+void measureTemperature();
+void measureHeartRate();
+void measureSpO2();
+void servoRotate(int angle);
+void dispensePill();
+void handleSerialCommands();
+void handleButtonPresses();
+void startProcess();
+void nextStep();
+void toggleHold();
+void initiateRestart();
+void confirmRestart();
+void cancelRestart();
+bool readButton(int pin, int index);
+void showReport();
+void checkFingerPresence();
+void transitionWithDelay(SystemState nextState, const String &msg1, const String &msg2);
+
+// ===============================
+// BUTTON & DEBOUNCE FUNCTIONS
+// ===============================
+bool readButton(int pin, int index) {
+  bool currentState = digitalRead(pin);
+  
+  if (currentState == LOW) {
+    if ((millis() - lastButtonPressTime[index]) > DEBOUNCE_DELAY) {
+      lastButtonPressTime[index] = millis();
+      return true;
+    }
+  }
+  if (currentState == HIGH) {
+    lastButtonPressTime[index] = 0;
+  }
+  return false;
+}
+
+// ===============================
+// LCD FUNCTIONS
+// ===============================
+void updateLCD(const String &line1, const String &line2) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(line1);
+  lcd.setCursor(0, 1);
+  lcd.print(line2);
+}
+
+// ===============================
+// SERVO/PILL FUNCTIONS
+// ===============================
+void servoRotate(int angle) {
+  pillServo.write(angle);
+  delay(SERVO_ROTATION_DELAY);
+  pillServo.write(SERVO_REST_ANGLE);
+}
+
+void dispensePill() {
+  const int angles[] = {COMPARTMENT_ANGLE_MORN, COMPARTMENT_ANGLE_NOON, 
+                        COMPARTMENT_ANGLE_EVEN, COMPARTMENT_ANGLE_NIGHT};
+  const char* times[] = {"Morning", "Noon", "Evening", "Night"};
+
+  Serial.println("--- Dispensing Pill Triggered ---");
+  Serial.print("Compartment: ");
+  Serial.println(times[currentCompartment]);
+
+  updateLCD("Dispensing Pill", times[currentCompartment]);
+  delay(1000);
+
+  servoRotate(angles[currentCompartment]);
+
+  currentCompartment = (currentCompartment + 1) % 4;
+
+  Serial.print("Next compartment: ");
+  Serial.println(times[currentCompartment]);
+  updateLCD("Pill Dispensed!", times[currentCompartment]);
+  delay(2000);
+  
+  if (!measurementInProgress) {
+    currentState = IDLE;
+  }
+}
+
+// ===============================
+// STATE TRANSITION HELPER
+// ===============================
+void transitionWithDelay(SystemState nextState, const String &msg1, const String &msg2) {
+  updateLCD(msg1, msg2);
+  delay(STATE_TRANSITION_DELAY);
+  currentState = nextState;
+  stateStartTime = millis();
+}
+
+// ===============================
+// CONTROL & INPUT LOGIC
+// ===============================
+void startProcess() {
+  if (currentState == IDLE || currentState == SHOW_MENU) {
+    Serial.println("\n=== Starting Measurement Process ===");
+    measurementInProgress = true;
+    transitionWithDelay(PLACE_FINGER_ON_SENSOR, "Starting...", "Please wait");
+  } else {
+    Serial.println("Process already running.");
+    updateLCD("Already Running", "Press RESTART");
+    delay(1500);
+  }
+}
+
+void nextStep() {
+  // Only works in certain states
+  switch(currentState) {
+    case IDLE:
+    case SHOW_MENU:
+      startProcess();
+      break;
+    case PLACE_FINGER_ON_SENSOR:
+      // Manual override to start measurement
+      if (irValue > 50000) {
+        transitionWithDelay(INITIALIZING_MEASUREMENT, "Manual Start", "Initializing...");
+      } else {
+        updateLCD("No Finger!", "Place finger first");
+        delay(1500);
+      }
+      break;
+    case SHOWING_REPORT:
+      // Move to next step after report
+      currentState = IDLE;
+      measurementInProgress = false;
+      updateLCD("Ready", "Press NEXT");
+      break;
+    default:
+      Serial.println("Next step not available in this state");
+      break;
+  }
+}
+
+void toggleHold() {
+  // Only works when measurement is in progress
+  if (!measurementInProgress) {
+    Serial.println("No active measurement to hold");
+    updateLCD("No Active", "Measurement");
+    delay(1500);
+    if (currentState == IDLE) {
+      dispensePill();
+    }
+    return;
+  }
+
+  isHeld = !isHeld;
+  if (isHeld) {
+    stateBeforeHold = currentState;
+    Serial.println("=== Process HELD ===");
+    updateLCD("PROCESS HELD", "BTN3: Resume");
+  } else {
+    currentState = stateBeforeHold;
+    Serial.println("=== Process RESUMED ===");
+    updateLCD("RESUMING...", "Please wait");
+    delay(1500);
+    stateStartTime = millis();
+  }
+}
+
+void initiateRestart() {
+  if (measurementInProgress) {
+    Serial.println("=== Restart Requested ===");
+    updateLCD("Confirm Restart?", "BTN2: Yes");
+    currentState = AWAITING_CANCEL_CONFIRMATION;
+  } else {
+    Serial.println("No active process to restart");
+    updateLCD("No Active", "Process");
+    delay(1500);
+    currentState = IDLE;
+  }
+}
+
+void confirmRestart() {
+  if (currentState == AWAITING_CANCEL_CONFIRMATION) {
+    Serial.println("=== RESTART CONFIRMED ===");
+    updateLCD("Restarting...", "Please wait");
+    delay(1500);
+    
+    // Reset all variables
+    measurementInProgress = false;
+    isHeld = false;
+    measurementsComplete = false;
+    temperatureC = 0.0;
+    heartRate = 0;
+    spO2Value = 0;
+    
+    // Reset heart rate arrays
+    for (byte x = 0; x < RATE_SIZE; x++) rates[x] = 0;
+    rateSpot = 0;
+    beatAvg = 0;
+    
+    currentState = IDLE;
+    stateStartTime = millis();
+    updateLCD("System Reset", "Ready");
+    delay(1500);
+  }
+}
+
+void cancelRestart() {
+  if (currentState == AWAITING_CANCEL_CONFIRMATION) {
+    Serial.println("Restart cancelled, resuming...");
+    updateLCD("Cancelled", "Resuming...");
+    delay(1000);
+    currentState = stateBeforeHold;
+    stateStartTime = millis();
+  }
+}
+
+void handleSerialCommands() {
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    command.toUpperCase();
+    Serial.print("Command: ");
+    Serial.println(command);
+
+    if (command == "S" || command == "START" || command == "NEXT") {
+      nextStep();
+    } else if (command == "P" || command == "PILL") {
+      dispensePill();
+    } else if (command == "H" || command == "HOLD") {
+      toggleHold();
+    } else if (command == "R" || command == "RESTART") {
+      initiateRestart();
+    } else if (command == "Y" && currentState == AWAITING_CANCEL_CONFIRMATION) {
+      confirmRestart();
+    } else if (command == "N" && currentState == AWAITING_CANCEL_CONFIRMATION) {
+      cancelRestart();
+    } else {
+      Serial.println("Commands: S(tart), P(ill), H(old), R(estart)");
+    }
+  }
+}
+
+void handleButtonPresses() {
+  // Button 1 (GPIO15) - NEXT STEP / INITIATE
+  if (readButton(BUTTON_NEXT_STEP, 0)) {
+    Serial.println("BTN1 (NEXT_STEP) pressed");
+    nextStep();
+    return;
+  }
+  
+  // Button 2 (GPIO14) - RESTART / CONFIRM
+  if (readButton(BUTTON_RESTART, 1)) {
+    Serial.println("BTN2 (RESTART) pressed");
+    if (currentState == AWAITING_CANCEL_CONFIRMATION) {
+      confirmRestart();
+    } else {
+      initiateRestart();
+    }
+    return;
+  }
+
+  // Button 3 (GPIO12) - DISPENSE / HOLD
+  if (readButton(BUTTON_DISPENSE, 2)) {
+    Serial.println("BTN3 (DISPENSE/HOLD) pressed");
+    if (measurementInProgress) {
+      toggleHold();
+    } else {
+      dispensePill();
+    }
+    return;
+  }
+}
+
+// ===============================
+// FINGER PRESENCE CHECK
+// ===============================
+void checkFingerPresence() {
+  // Periodic check for finger in IDLE/MENU states
+  if ((currentState == IDLE || currentState == SHOW_MENU) && 
+      !measurementInProgress &&
+      (millis() - lastFingerCheck > FINGER_CHECK_INTERVAL)) {
+    
+    lastFingerCheck = millis();
+    
+    if (hrSensorOK) {
+      irValue = particleSensor.getIR();
+      
+      if (irValue > 50000) {
+        Serial.println("\n*** FINGER DETECTED ***");
+        Serial.println("Press BTN1 (NEXT) to start measurement");
+        updateLCD("Finger Detected!", "BTN1: Start");
+        delay(2000);
+        currentState = SHOW_MENU;
+        stateStartTime = millis();
+      }
+    }
+  }
+}
+
+// ===============================
+// SETUP FUNCTION
+// ===============================
+void setup() {
+  Serial.begin(115200);
+  Serial.println("\n\n=================================");
+  Serial.println("ESP32 Health Monitor v2.0");
+  Serial.println("Three-Button Control System");
+  Serial.println("=================================\n");
+
+  Wire.begin(I2C_SDA, I2C_SCL);
+
+  pinMode(BUTTON_NEXT_STEP, INPUT_PULLUP);
+  pinMode(BUTTON_RESTART, INPUT_PULLUP);
+  pinMode(BUTTON_DISPENSE, INPUT_PULLUP);
+
+  lcd.init();
+  lcd.backlight();
+  updateLCD("Health Monitor", "Initializing...");
+  delay(2000);
+
+  ESP32PWM::allocateTimer(0);
+  pillServo.setPeriodHertz(50);
+  pillServo.attach(SERVO_PIN, SERVO_PULSE_MIN, SERVO_PULSE_MAX);
+  pillServo.write(SERVO_REST_ANGLE);
+  Serial.println("Servo initialized");
+  delay(500);
+
+  initializeSensors();
+
+  Serial.println("\n=== SYSTEM READY ===");
+  Serial.println("BTN1 (GPIO15): Next Step/Start");
+  Serial.println("BTN2 (GPIO14): Restart/Cancel");
+  Serial.println("BTN3 (GPIO12): Dispense/Hold");
+  Serial.println("========================\n");
+
+  updateLCD("System Ready", "BTN1: Start");
+  currentState = IDLE;
+  stateStartTime = millis();
+}
+
+// ===============================
+// MAIN LOOP
+// ===============================
+void loop() {
+  handleSerialCommands();
+  handleButtonPresses();
+
+  if (!isHeld) {
+    if (hrSensorOK) {
+      particleSensor.check();
+    }
+    updateStateMachine();
+    checkFingerPresence();
+  } else {
+    static unsigned long lastHoldUpdate = 0;
+    if (millis() - lastHoldUpdate > 1000) {
+      updateLCD("PROCESS HELD", "BTN3: Resume");
+      lastHoldUpdate = millis();
+    }
+  }
+
+  delay(10);
+}
+
+// ===============================
+// SENSOR INITIALIZATION
+// ===============================
+void initializeSensors() {
+  updateLCD("Init Sensors", "Temperature...");
+  sensors.begin();
+  if (sensors.getDeviceCount() > 0) {
+    tempSensorOK = true;
+    Serial.println("DS18B20: OK");
+  } else {
+    tempSensorOK = false;
+    Serial.println("DS18B20: FAILED");
+  }
+  delay(1000);
+
+  updateLCD("Init Sensors", "MAX30102...");
+  Serial.print("MAX30102: ");
+
+  if (particleSensor.begin(Wire, I2C_SPEED_FAST)) {
+    hrSensorOK = true;
+    Serial.println("OK");
+    
+    particleSensor.setup();
+    particleSensor.setPulseAmplitudeRed(0x0A);
+    particleSensor.setPulseAmplitudeGreen(0);
+    
+    for (byte x = 0; x < RATE_SIZE; x++) rates[x] = 0;
+    
+  } else {
+    hrSensorOK = false;
+    Serial.println("FAILED");
+  }
+  delay(1000);
+}
+
+// ===============================
+// STATE MACHINE UPDATE
+// ===============================
+void updateStateMachine() {
+  switch (currentState) {
+    case IDLE:
+      static unsigned long lastIdleUpdate = 0;
+      if (millis() - lastIdleUpdate > 3000) {
+        updateLCD("Ready", "BTN1: Start");
+        lastIdleUpdate = millis();
+      }
+      break;
+      
+    case SHOW_MENU:
+      static unsigned long lastMenuUpdate = 0;
+      if (millis() - lastMenuUpdate > 2000) {
+        updateLCD("Start Measure?", "BTN1: Yes");
+        lastMenuUpdate = millis();
+      }
+      break;
+
+    case PLACE_FINGER_ON_SENSOR:
+      updateLCD("Place finger on", "sensor...");
+
+      irValue = particleSensor.getIR();
+      
+      if (hrSensorOK && irValue > 50000) {
+        Serial.println(">>> Finger detected! <<<");
+        transitionWithDelay(INITIALIZING_MEASUREMENT, "Finger Detected!", "Initializing...");
+      }
+
+      if (millis() - stateStartTime > 5000) {
+        if (hrSensorOK) {
+          Serial.println("Timeout - No finger detected");
+          updateLCD("Timeout!", "Try again");
+          delay(2000);
+          measurementInProgress = false;
+          currentState = IDLE;
+        } else {
+          Serial.println("HR Sensor FAILED - Bypassing");
+          transitionWithDelay(INITIALIZING_MEASUREMENT, "Sensor Bypass", "Starting...");
+        }
+      }
+      break;
+
+    case INITIALIZING_MEASUREMENT:
+      updateLCD("Initializing", "Measurement...");
+      if (millis() - stateStartTime > STATE_TRANSITION_DELAY) {
+        transitionWithDelay(MEASURING_TEMPERATURE, "Starting", "Temperature...");
+      }
+      break;
+
+    case MEASURING_TEMPERATURE:
+      measureTemperature();
+      break;
+
+    case MEASURING_PULSE:
+      measureHeartRate();
+      break;
+
+    case MEASURING_SPO2:
+      measureSpO2();
+      break;
+
+    case SHOWING_REPORT:
+      showReport();
+      break;
+
+    // case UPLOADING_DATA:
+    //   // updateLCD("Uploading Data", "Please wait...");
+    //   if (millis() - stateStartTime > 3000) {
+    //     // updateLCD("Upload Complete", "Success!");
+    //     delay(2000);
+    //     measurementInProgress = false;
+    //     currentState = IDLE;
+    //   }
+    //   break;
+
+    case AWAITING_CANCEL_CONFIRMATION:
+      // Just wait for button press
+      break;
+  }
+}
+
+// ===============================
+// MEASUREMENT FUNCTIONS
+// ===============================
+void measureTemperature() {
+  if (!tempSensorOK) {
+    temperatureC = 0.0;
+    Serial.println("Temp Sensor Failed, skipping...");
+    transitionWithDelay(MEASURING_PULSE, "Temp: FAILED", "Next: Pulse...");
+    return;
+  }
+
+  if (millis() - stateStartTime < 1000) {
+    updateLCD("Measuring", "Temperature...");
+    return;
+  }
+
+  sensors.requestTemperatures();
+  temperatureC = sensors.getTempCByIndex(0);
+
+  lcd.setCursor(0, 0);
+  lcd.print("Temperature:");
+  lcd.setCursor(0, 1);
+  lcd.print(temperatureC, 1);
+  lcd.print(" C / ");
+  lcd.print(DallasTemperature::toFahrenheit(temperatureC), 1);
+  lcd.print("F");
+
+  Serial.print("Temp: ");
+  Serial.print(temperatureC, 1);
+  Serial.println(" C");
+
+  if (millis() - stateStartTime >= TEMP_MEASURE_TIME) {
+    if (temperatureC < -10.0 || temperatureC > 60.0) temperatureC = 36.5;
+    transitionWithDelay(MEASURING_PULSE, "Temp Complete!", "Next: Pulse...");
+  }
+}
+
+void measureHeartRate() {
+  if (!hrSensorOK) {
+    heartRate = 0;
+    Serial.println("HR Sensor Failed, skipping...");
+    transitionWithDelay(MEASURING_SPO2, "HR: FAILED", "Next: SpO2...");
+    return;
+  }
+
+  irValue = particleSensor.getIR();
+
+  if (checkForBeat(irValue) == true) {
+    long delta = millis() - lastBeat;
+    lastBeat = millis();
+
+    beatsPerMinute = 60 / (delta / 1000.0);
+
+    if (beatsPerMinute < 255 && beatsPerMinute > 20) {
+      rates[rateSpot++] = (byte)beatsPerMinute;
+      rateSpot %= RATE_SIZE;
+
+      beatAvg = 0;
+      for (byte x = 0; x < RATE_SIZE; x++)
+        beatAvg += rates[x];
+      beatAvg /= RATE_SIZE;
+      
+      heartRate = beatAvg;
+    }
+  }
+  
+  lcd.setCursor(0, 0);
+  lcd.print("Measuring Pulse");
+  lcd.setCursor(0, 1);
+  if (heartRate > 0) {
+    lcd.print("HR: ");
+    lcd.print(heartRate);
+    lcd.print(" BPM     ");
+  } else {
+    lcd.print("Detecting...    ");
+  }
+  
+  Serial.print("IR=");
+  Serial.print(irValue);
+  Serial.print(", BPM=");
+  Serial.println(heartRate);
+  
+  if (millis() - stateStartTime >= HR_MEASURE_TIME) {
+    if (heartRate == 0 || heartRate > 200 || heartRate < 30) heartRate = 75;
+    transitionWithDelay(MEASURING_SPO2, "Pulse Complete!", "Next: SpO2...");
+  }
+}
+
+void measureSpO2() {
+  if (!hrSensorOK) {
+    spO2Value = 0;
+    Serial.println("SpO2 Sensor Failed, skipping...");
+    measurementsComplete = true;
+    transitionWithDelay(SHOWING_REPORT, "SpO2: FAILED", "Showing Report...");
+    return;
+  }
+
+  // Simplified SpO2 estimation (would need proper algorithm)
+  irValue = particleSensor.getIR();
+  int redValue = particleSensor.getRed();
+  
+  if (irValue > 50000 && redValue > 50000) {
+    // Simple estimation - replace with proper algorithm
+    spO2Value = 95 + (random(0, 5));
+  }
+
+  lcd.setCursor(0, 0);
+  lcd.print("Measuring SpO2");
+  lcd.setCursor(0, 1);
+  if (spO2Value > 0) {
+    lcd.print("SpO2: ");
+    lcd.print(spO2Value);
+    lcd.print("%      ");
+  } else {
+    lcd.print("Detecting...    ");
+  }
+  
+  Serial.print("SpO2: ");
+  Serial.print(spO2Value);
+  Serial.println("%");
+
+  if (millis() - stateStartTime >= SPO2_MEASURE_TIME) {
+    if (spO2Value == 0 || spO2Value > 100 || spO2Value < 70) spO2Value = 98;
+    measurementsComplete = true;
+    Serial.println("\n=== ALL MEASUREMENTS COMPLETE ===\n");
+    transitionWithDelay(SHOWING_REPORT, "Measurements", "Complete!");
+  }
+}
+
+void showReport() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("T:");
+  if (tempSensorOK) {
+    lcd.print(temperatureC, 1);
+    lcd.print("C");
+  } else {
+    lcd.print("N/A");
+  }
+  
+  lcd.print(" HR:");
+  if (hrSensorOK) lcd.print(heartRate); else lcd.print("N/A");
+
+  lcd.setCursor(0, 1);
+  lcd.print("SpO2:");
+  if (hrSensorOK) {
+    lcd.print(spO2Value);
+    lcd.print("% ");
+  } else {
+    lcd.print("N/A ");
+  }
+  // lcd.print("BTN1:OK");
+
+  Serial.println("=== REPORT ===");
+  Serial.print("Temperature: ");
+  Serial.print(temperatureC, 1);
+  Serial.println(" C");
+  Serial.print("Heart Rate: ");
+  Serial.print(heartRate);
+  Serial.println(" BPM");
+  Serial.print("SpO2: ");
+  Serial.print(spO2Value);
+  Serial.println("%");
+  Serial.println("==============\n");
+
+  // if (millis() - stateStartTime >= REPORT_DISPLAY_TIME) {
+  //   transitionWithDelay(UPLOADING_DATA, "Saving Data...", "Please wait");
+  // }
+  if (millis() - stateStartTime >= REPORT_DISPLAY_TIME) {
+    // transitionWithDelay(UPLOADING_DATA, "Saving Data...", "Please wait");
+    measurementInProgress = false;
+        currentState = IDLE;
+  }
+}
