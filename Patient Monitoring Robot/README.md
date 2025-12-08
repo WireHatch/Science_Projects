@@ -1,5 +1,5 @@
 # ESP32 Health Monitoring System  
-### (MAX30102 | DS18B20 | LCD | Servo Pill Dispenser | Multi-Stage State Machine)
+### (MAX30102 | DS18B20 | LCD | Multi-Stage State Machine)
 
 ---
 
