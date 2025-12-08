@@ -21,7 +21,7 @@ User interaction happens through a **three-button control interface** supporting
 |----------------|-------------|
 | NEXT / START | Begin or advance process |
 | RESTART / CONFIRM | Reset measurement or confirm restart |
-| HOLD / DISPENSE | Pause ongoing process or interact with dispenser |
+| HOLD | Pause ongoing process |
 
 A non-blocking **state machine** runs the workflow including finger detection, measurement sequencing, reporting, and restart handling.
 
@@ -37,7 +37,7 @@ A non-blocking **state machine** runs the workflow including finger detection, m
 | **LCD Display (I2C)** | SDA / SCL | GPIO 21 / GPIO 22 |
 | **Button A (Next / Start)** | Input Pull-Up | GPIO 15 |
 | **Button B (Restart / Confirm)** | Input Pull-Up | GPIO 14 |
-| **Button C (Hold / Dispense)** | Input Pull-Up | GPIO 12 |
+| **Button C (Hold)** | Input Pull-Up | GPIO 12 |
 
 ---
 
@@ -104,7 +104,7 @@ A non-blocking **state machine** runs the workflow including finger detection, m
 4. **Heart rate is measured** using peak-to-peak timing.
 5. **SpO₂ is estimated**.
 6. **Results displayed on LCD**.
-7. (Optional) **Hold / Restart / Pill dispense actions** available anytime.
+7. (Optional) **Hold / Restart ** available anytime.
 
 ---
 
