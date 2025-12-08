@@ -81,21 +81,6 @@ A non-blocking **state machine** runs the workflow including finger detection, m
 
 ---
 
-### 3️⃣ Servo Motor Mechanism
-
-- Controlled through ESP32 PWM signal.
-- Moves to specific angles to rotate a pill dispenser compartment.
-
-| Compartment | Angle |
-|------------|-------|
-| Morning | 0° |
-| Noon | 45° |
-| Evening | 90° |
-| Night | 135° |
-| Rest Position | 180° |
-
----
-
 ## 🔄 Process Summary
 
 1. **User presses NEXT** → System initializes.
@@ -115,7 +100,6 @@ A non-blocking **state machine** runs the workflow including finger detection, m
 | `Wire.h` | I2C communication |
 | `LiquidCrystal_I2C.h` | LCD interfacing |
 | `DallasTemperature.h` & `OneWire.h` | DS18B20 sensing |
-| `ESP32Servo.h` | Servo control |
 | `MAX30105.h`, `spo2_algorithm.h`, `heartRate.h` | MAX30102 processing |
 
 ---
