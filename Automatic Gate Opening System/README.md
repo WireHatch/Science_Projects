@@ -35,9 +35,9 @@ When motion is detected, the system:
 |----------|-------------|-------|
 | Red LED        | D5 | GPIO14 |
 | Yellow LED     | D6 | GPIO12 |
-| Green LED      | D7 | GPIO13 |
-| PIR Sensor OUT | D1 | GPIO5  |
-| Servo Signal   | D4 | GPIO2  |
+| Green LED      | D7 | |
+| PIR Sensor OUT | D3 | GPIO5  |
+| Servo Signal   | D2 |   |
 |   | Optional |   |
 | SDA  | D1 | GPIO5  |
 | SCL   | D2 | GPIO4 |
