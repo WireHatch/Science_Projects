@@ -39,6 +39,9 @@ A non-blocking **state machine** runs the workflow including finger detection, m
 | **Button B (Restart / Confirm)** | Input Pull-Up | GPIO 14 |
 | **Button C (Hold)** | Input Pull-Up | GPIO 12 |
 
+### Pin Diagram of ESP32:
+<img width="727" height="508" alt="ESP32-Pinout" src="https://github.com/user-attachments/assets/95b9ce0c-fa31-4374-b9f3-594e0fb24875" />
+
 ---
 
 ## 🧠 System Stages (State Machine Flow)
