@@ -36,7 +36,7 @@ This system can be used for:
 | Component | NodeMCU Pin | GPIO |
 |-----------|-------------|------|
 | Rain Sensor (DO) | D3 | GPIO0 |
-| Servo Signal | D4 | GPIO2 |
+| Servo Signal | D5 |  |
 
 ### ⚠ Important:
 - **Never power the servo from NodeMCU 3.3V pin.**
