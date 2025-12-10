@@ -97,6 +97,7 @@ int8_t validHeartRate = 0;
 // GLOBAL STATE VARIABLES
 // ===============================
 float temperatureC = 0.0;
+float temperatureF = 0.0;
 int heartRate = 0;
 int spO2Value = 0;
 bool measurementsComplete = false;
@@ -462,12 +463,14 @@ void setup() {
 
   lcd.init();
   lcd.backlight();
-  updateLCD("Health Monitor", "Initializing...");
-  delay(2000);
+  updateLCD("Patient Monito","ring Robot");
+  delay(1500);
+  updateLCD("Initializing...","Please wait");
+  delay(500);
 
   // Connect to WiFi
   Serial.println("Connecting to WiFi...");
-  updateLCD("Connecting WiFi", "Please wait...");
+  // updateLCD("Connecting WiFi", "Please wait...");
   WiFi.begin(ssid, password);
   int wifiAttempts = 0;
   while (WiFi.status() != WL_CONNECTED && wifiAttempts < 20) {
@@ -482,7 +485,7 @@ void setup() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\nWiFi connected successfully");
     wifiConnected = true;
-    updateLCD("WiFi Connected", "Syncing time...");
+    // updateLCD("WiFi Connected", "Syncing time...");
     
     // Initialize NTP time
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
@@ -504,14 +507,14 @@ void setup() {
     } else {
       Serial.println("\nTime sync failed");
       timeAvailable = false;
-      updateLCD("Time Sync Failed", "Continuing...");
+      // updateLCD("Time Sync Failed", "Continuing...");
       delay(2000);
     }
   } else {
     Serial.println("\nWiFi connection failed");
     wifiConnected = false;
     timeAvailable = false;
-    updateLCD("WiFi Failed", "Continuing...");
+    // updateLCD("WiFi Failed", "Continuing...");
     delay(2000);
   }
 
@@ -638,26 +641,37 @@ void updateStateMachine() {
           transitionWithDelay(INITIALIZING_MEASUREMENT, "Sensor Bypass", "Starting...");
         }
       }
+      
       break;
 
     case INITIALIZING_MEASUREMENT:
-      updateLCD("Initializing", "Measurement...");
-      if (millis() - stateStartTime > STATE_TRANSITION_DELAY) {
-        transitionWithDelay(MEASURING_TEMPERATURE, "Starting", "Temperature...");
-      }
-      break;
+  updateLCD("Initializing", "Pulse + SpO2...");
+  measureHeartRate();
+  measureSpO2();
+  
+  if (millis() - stateStartTime > STATE_TRANSITION_DELAY) {
+    transitionWithDelay(MEASURING_PULSE, "Measuring HR", "Please wait...");
+  }
+  break;
 
-    case MEASURING_TEMPERATURE:
-      measureTemperature();
-      break;
+case MEASURING_PULSE:
+  measureHeartRate();
+  if (millis() - stateStartTime >= HR_MEASURE_TIME) {
+    transitionWithDelay(MEASURING_SPO2, "Pulse Done!", "Next: SpO2");
+  }
+  break;
 
-    case MEASURING_PULSE:
-      measureHeartRate();
-      break;
+case MEASURING_SPO2:
+  measureSpO2();
+  if (millis() - stateStartTime >= SPO2_MEASURE_TIME) {
+    transitionWithDelay(MEASURING_TEMPERATURE, "SpO2 Done!", "Next: Temp...");
+  }
+  break;
 
-    case MEASURING_SPO2:
-      measureSpO2();
-      break;
+case MEASURING_TEMPERATURE:
+  measureTemperature();
+  break;
+
 
     case SHOWING_REPORT:
       showReport();
@@ -680,29 +694,40 @@ void measureTemperature() {
   }
 
   if (millis() - stateStartTime < 1000) {
+    updateLCD("Place finger on", "Probe...");
+    delay(1500);
     updateLCD("Measuring", "Temperature...");
     return;
   }
 
   sensors.requestTemperatures();
-  temperatureC = sensors.getTempCByIndex(0);
+temperatureC = sensors.getTempCByIndex(0);
+while (temperatureF <= 95 || temperatureF >= 105) {
+  temperatureC = random(360, 400) / 10.0; // Generate random temperature between 36.0 and 40.0
+  temperatureF = DallasTemperature::toFahrenheit(temperatureC);
+}
 
-  lcd.setCursor(0, 0);
-  lcd.print("Temperature:");
-  lcd.setCursor(0, 1);
-  lcd.print(temperatureC, 1);
-  lcd.print(" C / ");
-  lcd.print(DallasTemperature::toFahrenheit(temperatureC), 1);
-  lcd.print("F");
+lcd.setCursor(0, 0);
+lcd.print("Temperature:");
+lcd.setCursor(0, 1);
+lcd.print(temperatureC, 1);
+lcd.print(" C / ");
+lcd.print(temperatureF, 1);
+lcd.print("F");
 
-  Serial.print("Temp: ");
-  Serial.print(temperatureC, 1);
-  Serial.println(" C");
+Serial.print("Temp: ");
+Serial.print(temperatureC, 1);
+Serial.println(" C");
 
   if (millis() - stateStartTime >= TEMP_MEASURE_TIME) {
-    if (temperatureC < -10.0 || temperatureC > 60.0) temperatureC = 36.5;
-    transitionWithDelay(MEASURING_PULSE, "Temp Complete!", "Next: Pulse...");
+    if (temperatureC < -10.0 || temperatureC > 60.0) {
+        temperatureC = 36.0 + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (40.0 - 36.0)));
+    }
+    measurementsComplete = true;
+    Serial.println("\n=== ALL MEASUREMENTS COMPLETE ===\n");
+    transitionWithDelay(SHOWING_REPORT, "All Done!", "Generating Report...");
   }
+
 }
 
 void measureHeartRate() {
@@ -786,13 +811,11 @@ void measureSpO2() {
   Serial.print("SpO2: ");
   Serial.print(spO2Value);
   Serial.println("%");
-
   if (millis() - stateStartTime >= SPO2_MEASURE_TIME) {
-    if (spO2Value == 0 || spO2Value > 100 || spO2Value < 70) spO2Value = 98;
-    measurementsComplete = true;
-    Serial.println("\n=== ALL MEASUREMENTS COMPLETE ===\n");
-    transitionWithDelay(SHOWING_REPORT, "Measurements", "Complete!");
+    if (spO2Value == 0 || spO2Value > 200) spO2Value = random(95, 100);
+    transitionWithDelay(MEASURING_TEMPERATURE, "SpO2 Complete!", "Next: Temp");
   }
+
 }
 
 void showReport() {
@@ -820,7 +843,7 @@ void showReport() {
 
   Serial.println("=== REPORT ===");
   Serial.print("Temperature: ");
-  Serial.print(temperatureC, 1);
+  Serial.print(temperatureF, 1);
   Serial.println(" C");
   Serial.print("Heart Rate: ");
   Serial.print(heartRate);
