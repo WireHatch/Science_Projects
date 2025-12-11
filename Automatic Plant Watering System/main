@@ -1,0 +1,85 @@
+// Automatic Plant Watering System with ESP8266
+// Components: ESP8266, Soil Moisture Sensor, L298N, Water Pump
+
+// Pin Definitions
+#define SOIL_SENSOR_PIN A0    // Soil moisture sensor analog pin
+#define MOTOR_IN1 5           // L298N IN1 (GPIO5)
+#define MOTOR_IN2 4           // L298N IN2 (GPIO4)
+#define MOTOR_ENA 0           // L298N ENA (GPIO0) - for PWM speed control
+
+// Moisture threshold values (adjust based on your sensor)
+#define DRY_SOIL 800          // Value when soil is dry (needs water)
+#define WET_SOIL 400          // Value when soil is wet (stop watering)
+
+// Watering duration and check interval
+#define WATERING_DURATION 5000   // Pump runs for 5 seconds
+#define CHECK_INTERVAL 10000     // Check moisture every 10 seconds
+
+void setup() {
+  // Initialize Serial Monitor
+  Serial.begin(115200);
+  Serial.println("\n=== Automatic Plant Watering System ===");
+  
+  // Configure motor driver pins as outputs
+  pinMode(MOTOR_IN1, OUTPUT);
+  pinMode(MOTOR_IN2, OUTPUT);
+  pinMode(MOTOR_ENA, OUTPUT);
+  
+  // Initially stop the pump
+  stopPump();
+  
+  Serial.println("System initialized. Starting moisture monitoring...");
+}
+
+void loop() {
+  // Read soil moisture sensor
+  int moistureLevel = analogRead(SOIL_SENSOR_PIN);
+  
+  // Display moisture reading
+  Serial.print("Soil Moisture Level: ");
+  Serial.print(moistureLevel);
+  
+  // Determine soil condition
+  if (moistureLevel > DRY_SOIL) {
+    Serial.println(" - Soil is DRY! Watering plant...");
+    waterPlant();
+  } 
+  else if (moistureLevel < WET_SOIL) {
+    Serial.println(" - Soil is WET. No watering needed.");
+    stopPump();
+  } 
+  else {
+    Serial.println(" - Soil moisture is OK.");
+    stopPump();
+  }
+  
+  // Wait before next check
+  delay(CHECK_INTERVAL);
+}
+
+// Function to start the water pump
+void startPump() {
+  digitalWrite(MOTOR_IN1, HIGH);
+  digitalWrite(MOTOR_IN2, LOW);
+  analogWrite(MOTOR_ENA, 255);  // Full speed (0-255)
+  Serial.println(">> Pump STARTED");
+}
+
+// Function to stop the water pump
+void stopPump() {
+  digitalWrite(MOTOR_IN1, LOW);
+  digitalWrite(MOTOR_IN2, LOW);
+  analogWrite(MOTOR_ENA, 0);
+}
+
+// Function to water the plant for specified duration
+void waterPlant() {
+  startPump();
+  delay(WATERING_DURATION);
+  stopPump();
+  Serial.println(">> Pump STOPPED after watering");
+  Serial.println("---");
+  
+  // Wait a bit before checking again to let water absorb
+  delay(30000);  // Wait 30 seconds for water to absorb into soil
+}
