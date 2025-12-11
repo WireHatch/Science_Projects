@@ -82,12 +82,3 @@ The ESP8266 reads the analog moisture value and decides whether to start or stop
 
 ## 📂 Project Code
 The full working source code is provided in the main `.ino` file.
-
----
-
-If you want, I can also generate:
-✅ **Circuit diagram (image)**  
-✅ **Folder structure for the repo**  
-✅ **A version with badges, GIFs, or wiring illustrations**
-
-Just tell me!
